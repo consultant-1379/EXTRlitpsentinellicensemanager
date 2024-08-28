@@ -1,0 +1,3 @@
+#  sentinel env variables
+
+export LSERVRC=/opt/SentinelRMSSDK/licenses/lservrc

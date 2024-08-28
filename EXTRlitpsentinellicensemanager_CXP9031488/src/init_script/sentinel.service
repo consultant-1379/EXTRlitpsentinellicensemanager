@@ -1,0 +1,13 @@
+[Unit]
+Description=Sentinel RMS (lserv)
+After=network.target
+
+[Service]
+ExecStart=/opt/SentinelRMSSDK/bin/lserv
+ExecStop=/opt/SentinelRMSSDK/bin/lsrvdown localhost
+Environment=LSERVRC=/opt/SentinelRMSSDK/licenses/lservrc
+Environment=LSERVSTA=/var/log/lservsta
+SuccessExitStatus=2
+
+[Install]
+WantedBy=multi-user.target

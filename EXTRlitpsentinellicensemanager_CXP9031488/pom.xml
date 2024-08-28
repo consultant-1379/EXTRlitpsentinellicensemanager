@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.ericsson.nms.litp.3pps</groupId>
+  <artifactId>EXTRlitpsentinellicensemanager_CXP9031488</artifactId>
+  <packaging>${rpm.packaging}</packaging>
+  <name>[${project.parent.artifactId}] RPM module</name>
+  <description>LITP sentinellicensemanager</description>
+
+    <parent>
+        <groupId>com.ericsson.nms.litp.3pps</groupId>
+        <artifactId>EXTRlitpsentinellicensemanager</artifactId>
+        <version>2.4.1-SNAPSHOT</version>
+    </parent>
+
+  <properties>
+    <!-- publishes the rpm module to the ci portal -->
+    <publish_artifact>true</publish_artifact>
+    <packaging.type>rpm</packaging.type>
+  </properties>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>2.8</version>
+        <executions>
+          <execution>
+            <id>Download Sentinel 8.6.2 Image</id>
+            <phase>initialize</phase>
+            <goals>
+              <goal>copy-dependencies</goal>
+            </goals>
+            <configuration>
+              <excludeTransitive>false</excludeTransitive>
+              <outputDirectory>${project.build.directory}/tar</outputDirectory>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>1.2.1</version>
+        <executions>
+          <execution>
+            <!-- Creating helper directories for Sentinel under <project>/target
+              * Sentinel-installer - directory which will contain the Sentinel installation binaries
+              * Sentinel - directory with installed Sentinel from which we will be building RPM
+            -->
+            <id>Creating Sentinel directories</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>exec</goal>
+            </goals>
+            <configuration>
+              <executable>mkdir</executable>
+              <arguments>
+                <argument>-p</argument>
+                <argument>${project.build.directory}/Sentinel-installer</argument>
+                <argument>${project.build.directory}/Sentinel</argument>
+              </arguments>
+            </configuration>
+          </execution>
+          <execution>
+            <!-- Extracting the Sentinel installation binaries from the tar file -->
+            <id>Extracting Sentinel tar file</id>
+            <phase>process-sources</phase>
+            <goals>
+              <goal>exec</goal>
+            </goals>
+            <configuration>
+              <executable>tar</executable>
+              <workingDirectory>${project.build.directory}/tar</workingDirectory>
+              <arguments>
+                <argument>-xzvf</argument>
+                <argument>${sentinel.tar.name}.tar.gz</argument>
+                <argument>-C</argument>
+                <argument>${project.build.directory}/Sentinel-installer</argument>
+              </arguments>
+            </configuration>
+          </execution>
+          <execution>
+              <id>patch install_sentinel.bsh</id>
+              <phase>generate-resources</phase>
+              <goals>
+                  <goal>exec</goal>
+              </goals>
+              <configuration>
+                  <environmentVariables>
+                      <TMPDIR>
+                          ${project.build.directory}
+                      </TMPDIR>
+                  </environmentVariables>
+                  <executable>patch</executable>
+                  <arguments>
+                      <argument>${project.build.directory}/Sentinel-installer/ERICsentinel/install_sentinel.bsh</argument>
+                      <argument>${basedir}/src/patchFiles/install_sentinel_bsh.patch</argument>
+                  </arguments>
+              </configuration>
+          </execution>
+          <execution>
+            <!--
+              Installing Sentinel under <project>/target/Sentinel using the
+              expect script. The expect script will take 2 arguments:
+              * The directory under which it will be installed
+              * Sentinel license number for Ericsson
+            -->
+            <id>Installing Sentinel</id>
+            <phase>compile</phase>
+            <goals>
+              <goal>exec</goal>
+            </goals>
+            <configuration>
+              <executable>${project.build.directory}/Sentinel-installer/ERICsentinel/install_sentinel.bsh</executable>
+              <workingDirectory>${project.build.directory}/Sentinel-installer/ERICsentinel</workingDirectory>
+              <arguments>
+                <argument>${project.build.directory}/Sentinel/SentinelRMSSDK/</argument>
+              </arguments>
+            </configuration>
+          </execution>
+          <execution>
+            <!--
+                LITPCDS-11238 request change from team voyager in San Jose
+                The file located in /opt/SentinelRMSSDK/bin/echoid.dat on the MS
+                specifies the license locking criterion for the Sentinel license manager.
+                By default, the locking criterion is set to 0x3D9F or 11110110011111
+                as "All criteria".
+                Using the default locking criterion value, licenses generated from the
+                ETK portal will fail to install when the hostname is specified in ETK,
+                as per customer installations. Customers will not be able to install
+                licenses with this default setting
+                Initial install of Sentinel should specify 0x008(VLS_LOCK_HOSTNAME) as the
+                lock selector rather than 0x3D9F
+                in /opt/SentinelRMSSDK/bin/echoid.dat
+            -->
+            <id>Update Sentinel lock selector</id>
+            <phase>compile</phase>
+            <goals>
+              <goal>exec</goal>
+            </goals>
+            <configuration>
+              <executable>${basedir}/src/update_lock_selector.sh</executable>
+              <workingDirectory>${project.build.directory}/Sentinel/SentinelRMSSDK/bin</workingDirectory>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>rpm-maven-plugin</artifactId>
+        <extensions>true</extensions>
+        <inherited>true</inherited>
+        <!--
+          The maven plugin to build Sentinel RPM.
+        -->
+        <configuration>
+          <packager>Ericsson AB</packager>
+          <needarch>x86_64</needarch>
+          <autoRequires>false</autoRequires>
+          <requires>
+            <require>glibc(x86-32) &gt;= 2.17</require>
+            <require>ncurses-libs &gt;= 5.9</require>
+          </requires>
+          <mappings>
+            <mapping>
+              <directory>/opt/SentinelRMSSDK</directory>
+              <directoryIncluded>true</directoryIncluded>
+              <sources>
+                <source>
+                  <location>${project.build.directory}/Sentinel/SentinelRMSSDK/</location>
+                </source>
+              </sources>
+            </mapping>
+            <mapping>
+              <directory>/opt/SentinelRMSSDK/bin/ </directory>
+              <directoryIncluded>true</directoryIncluded>
+              <filemode>644</filemode>
+              <sources>
+                <source>
+                  <location>${basedir}/src/init_script</location>
+                </source>
+              </sources>
+            </mapping>
+            <mapping>
+              <directory>/etc/sysconfig/</directory>
+              <directoryIncluded>true</directoryIncluded>
+              <sources>
+                <source>
+                  <location>${basedir}/src/sentinel_sysconfig</location>
+                </source>
+              </sources>
+            </mapping>
+            <mapping>
+              <directory>/opt/SentinelRMSSDK/licenses/</directory>
+              <directoryIncluded>true</directoryIncluded>
+              <filemode>640</filemode>
+              <configuration>true</configuration>
+              <sources>
+                <source>
+                  <location>${basedir}/src/lservrc</location>
+                </source>
+              </sources>
+            </mapping>
+          </mappings>
+          <postinstallScriptlet>
+            <scriptFile>src/post_install.sh</scriptFile>
+            <fileEncoding>utf-8</fileEncoding>
+          </postinstallScriptlet>
+          <postremoveScriptlet>
+            <scriptFile>src/post_uninstall.sh</scriptFile>
+            <fileEncoding>utf-8</fileEncoding>
+          </postremoveScriptlet>
+
+          <preremoveScriptlet>
+            <scriptFile>src/pre_uninstall.sh</scriptFile>
+            <fileEncoding>utf-8</fileEncoding>
+          </preremoveScriptlet>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+
+  <dependencies>
+    <!-- Download Sentinel 8.6.2 tar.gz -->
+    <dependency>
+      <groupId>com.safenet</groupId>
+      <artifactId>sentinel-license-manager</artifactId>
+      <version>8.6.2</version>
+      <type>tar.gz</type>
+    </dependency>
+  </dependencies>
+</project>

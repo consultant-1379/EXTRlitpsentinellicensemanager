@@ -1,0 +1,14 @@
+--- install_sentinel_orig.bsh	2022-10-10 18:16:18.114432966 +0100
++++ install_sentinel.bsh	2022-10-11 11:45:33.660262210 +0100
+@@ -194,9 +194,9 @@ chmod -R  755 ${TARGET_SENTINEL_INSTALLA
+ chmod -R  644 ${TARGET_SENTINEL_INSTALLATION_DIR}/bin/*.dat         &> /dev/null
+ chmod -R  400 ${TARGET_SENTINEL_INSTALLATION_DIR}/bin/sentinel.sh  &> /dev/null
+ chmod -R  755 ${TARGET_SENTINEL_INSTALLATION_DIR}/lib/              &> /dev/null
+-chmod -R  644 ${TARGET_SENTINEL_INSTALLATION_DIR}/lib/*             &> /dev/null
++find ${TARGET_SENTINEL_INSTALLATION_DIR}/lib/ -type f -exec chmod 644 {} \; &> /dev/null
+ chmod -R  755 ${TARGET_SENTINEL_INSTALLATION_DIR}/lib64/            &> /dev/null
+-chmod -R  644 ${TARGET_SENTINEL_INSTALLATION_DIR}/lib64/*           &> /dev/null
++find ${TARGET_SENTINEL_INSTALLATION_DIR}/lib64/ -type f -exec chmod 644 {} \; &> /dev/null
+ chmod -R  755 ${TARGET_SENTINEL_INSTALLATION_DIR}/Java/             &> /dev/null
+ chmod -R  755 ${TARGET_SENTINEL_INSTALLATION_DIR}/Manuals/          &> /dev/null
+ chmod -R  755 ${TARGET_SENTINEL_INSTALLATION_DIR}/etc/              &> /dev/null
